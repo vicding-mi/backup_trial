@@ -9,7 +9,9 @@ from typing import Dict, List
 import logging
 
 # Load config
-with open('backup_config.yaml') as f:
+dag_dir = os.path.dirname(os.path.realpath(__file__))
+config_path = os.path.join(dag_dir, 'backup_config.yml')
+with open(config_path) as f:
     config = yaml.safe_load(f)
 
 class BackupHandler:

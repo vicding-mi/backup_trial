@@ -1,4 +1,6 @@
 .venv/
 .idea/
 .env
-
+__pycache__
+sample_apache_airflow/airflow_postgres_data/
+sample_apache_airflow/mydb/

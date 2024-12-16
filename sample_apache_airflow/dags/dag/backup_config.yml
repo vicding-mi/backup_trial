@@ -1,11 +1,11 @@
 databases:
   postgresql1:
     type: postgresql  # or mysql
-    host: postgresql1
+    host: mydbserver
     port: 5432
-    database: mydb
-    user: backup_user
-    password: "backup_user" # from ENV value "{{ conn.db_backup.password }}"
+    database: mybackup
+    user: mybackup
+    password: "mybackup" # from ENV value "{{ conn.db_backup.password }}"
     
 backup_settings:
   base_backup_schedule: "0 0 * * 0"  # Weekly full backup

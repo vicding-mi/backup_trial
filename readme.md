@@ -1,6 +1,6 @@
 # Backup Postgresql and Mysql
 
-This repository contains DAG recepie for backing up databases over network. The schedule is configured through the `backup_config.yaml` file. The DAG will automatically create full and incremental backups based on the schedule and retention period. Old backup sets are cleaned up based on the retention period and only full sets will be removed to make sure there is no dangling incremental backups.
+This repository contains DAG recepie for backing up databases over network. The schedule is configured by using the `backup_config.yaml` file. The DAG will automatically create full and incremental backups based on the schedule and retention period. Old backup sets are cleaned up based on the retention period and only full sets will be removed to make sure there is no dangling incremental backups.
 
 ## Key features of this implementation
 
@@ -21,7 +21,7 @@ Set up database connection credentials in Airflow connections
 The DAG will automatically schedule backups based on the configuration
 The DAG creates a directory structure like:
 
-```
+```text
 backup_location/
   database_name/
     20240315_120000/
@@ -30,4 +30,20 @@ backup_location/
     20240316_120000/
       incremental.backup
     ...
+```
+
+### Generate a new Fernet key
+
+```python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"```
+
+### Create Airflow Admin account
+
+```shell
+docker compose run airflow airflow users create \
+    --username admin \
+    --password admin \
+    --firstname Admin \
+    --lastname User \
+    --role Admin \
+    --email admin@example.com
 ```
