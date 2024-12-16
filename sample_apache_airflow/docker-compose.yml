@@ -1,5 +1,14 @@
 version: '3'
 services:
+  mydbserver: # This is the testing db server to be backed up
+    image: postgres:13
+    environment:
+      POSTGRES_USER: mybackup
+      POSTGRES_PASSWORD: mybackup
+      POSTGRES_DB: mybackup
+    volumes:
+      - ./mydb:/var/lib/postgresql/data
+
   postgres:
     image: postgres:13
     environment:
@@ -7,7 +16,8 @@ services:
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
     volumes:
-      - ./postgres_data:/var/lib/postgresql/data
+      - ./airflow_postgres_data:/var/lib/postgresql/data
+  
   redis:
     image: redis:latest
   airflow:
@@ -26,13 +36,14 @@ services:
     ports:
       - "8080:8080"
     command: webserver
+  
   scheduler:
     image: apache/airflow:2.6.2
     depends_on:
       - airflow
     environment:
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
-      AIRFLOW__CORE__FERNET_KEY: "YOUR_FERNET_KEY"
+      AIRFLOW__CORE__FERNET_KEY:  "${FERNET_KEY}"
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
       AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
