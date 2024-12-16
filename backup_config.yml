@@ -1,0 +1,15 @@
+databases:
+  postgresql1:
+    type: postgresql  # or mysql
+    host: postgresql1
+    port: 5432
+    database: mydb
+    user: backup_user
+    password: "backup_user" # from ENV value "{{ conn.db_backup.password }}"
+    
+backup_settings:
+  base_backup_schedule: "0 0 * * 0"  # Weekly full backup
+  incremental_schedule: "0 0 * * 1-6"  # Daily incremental
+  retention_days: 30
+  backup_location: /backup/data/postgresql1/mydb
+  parallel_jobs: 2
