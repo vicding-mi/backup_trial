@@ -6,12 +6,24 @@ databases:
     database: mybackup
     user: mybackup
     password: "mybackup" # from ENV value "{{ conn.db_backup.password }}"
+    backup_type: "base" # or "incremental"
+    tags: ["backup", "postgresql"]
+  mysqltest:
+    type: mysql
+    host: mysqltest
+    port: 3306
+    database: mysqltest
+    user: mysqltest
+    password: "mysqltest"
+    backup_type: "base"
+    tags: ["backup", "mysql"]
 
 
 backup_settings:
-  base_backup_schedule: "*/5 * * * *"  # Every 5 minutes
+  base_backup_schedule: "0 23 * * *"  # Every 5 minutes
+#  base_backup_schedule: "*/5 * * * *"  # Every 5 minutes
   incremental_schedule: "0 0 * * 1-6"  # Daily incremental
-  retention_days: 30
+  retention_days: 7
   backup_location: /backup/data/postgresql1/mydb
   parallel_jobs: 2
 

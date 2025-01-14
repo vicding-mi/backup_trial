@@ -26,16 +26,26 @@ class BackupHandler:
 
 
 class PostgresBackupHandler:
+    # def base_backup_cmd(self, db_config: Dict, backup_path: str) -> List[str]:
+    #     return [
+    #         'pg_basebackup',
+    #         '-h', db_config['host'],
+    #         '-p', str(db_config['port']),
+    #         '-U', db_config['user'],
+    #         '-D', backup_path,
+    #         '-Ft',
+    #         '-z',
+    #         '-P'
+    #     ]
     def base_backup_cmd(self, db_config: Dict, backup_path: str) -> List[str]:
         return [
-            'pg_basebackup',
+            'pg_dump',
             '-h', db_config['host'],
             '-p', str(db_config['port']),
             '-U', db_config['user'],
-            '-D', backup_path,
-            '-Ft',
-            '-z',
-            '-P'
+            '-Fp',
+            db_config['database'],
+            '-f', backup_path
         ]
 
     def incremental_backup_cmd(self, db_config: Dict, backup_path: str, base_path: str) -> List[str]:
@@ -59,9 +69,9 @@ class MySQLBackupHandler:
             '-P', str(db_config['port']),
             '-u', db_config['user'],
             f"--password={db_config['password']}",
-            '--all-databases',
-            '--single-transaction',
-            f'> {backup_path}'
+            f'{db_name}',
+            # '--single-transaction',
+            # f'> {backup_path}'
         ]
 
     def incremental_backup_cmd(self, db_config: Dict, backup_path: str, base_path: str) -> List[str]:
@@ -91,36 +101,6 @@ def _remove_backup_set(backup_set_path: str):
     subprocess.run(['rm', '-rf', backup_set_path], check=True)
 
 
-def perform_backup(db_name: str, backup_type: str, **context):
-    db_config = config['databases'][db_name]
-    backup_settings = config['backup_settings']
-
-    handler = BackupHandler.get_handler(db_config['type'])
-
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    backup_dir = os.path.join(
-        backup_settings['backup_location'],
-        db_name,
-        timestamp
-    )
-    os.makedirs(backup_dir, exist_ok=True)
-
-    backup_path = os.path.join(backup_dir, f"{backup_type}.backup")
-
-    if backup_type == 'base':
-        cmd = handler.base_backup_cmd(db_config, backup_path)
-    else:
-        base_backup = _find_latest_base_backup(db_name)
-        cmd = handler.incremental_backup_cmd(db_config, backup_path, base_backup)
-
-    env = os.environ.copy()
-    env['PGPASSWORD'] = db_config['password']  # For PostgreSQL
-
-    result = subprocess.run(cmd, env=env, check=True)
-    if result.returncode != 0:
-        raise Exception(f"Backup failed with exit code {result.returncode}")
-
-
 def cleanup_old_backups(db_name: str, **context):
     backup_settings = config['backup_settings']
     backup_root = os.path.join(backup_settings['backup_location'], db_name)
@@ -144,41 +124,106 @@ default_args = {
     'retry_delay': timedelta(minutes=5),
 }
 
+# Updated perform_backup function
+def perform_backup(db_name: str, **context):
+    db_config = config['databases'][db_name]
+    backup_settings = config['backup_settings']
+
+    # Read backup type from config, default to 'base'
+    backup_type = db_config.get('backup_type', 'base')
+
+    handler = BackupHandler.get_handler(db_config['type'])
+
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    backup_dir = os.path.join(
+        backup_settings['backup_location'],
+        db_name,
+        timestamp
+    )
+    os.makedirs(backup_dir, exist_ok=True)
+
+    backup_path = os.path.join(backup_dir, f"{backup_type}.backup")
+
+    if backup_type == 'base':
+        cmd = handler.base_backup_cmd(db_config, backup_path)
+    else:
+        base_backup = _find_latest_base_backup(db_name)
+        cmd = handler.incremental_backup_cmd(db_config, backup_path, base_backup)
+
+    env = os.environ.copy()
+    env['PGPASSWORD'] = db_config['password']  # For PostgreSQL
+
+    if db_config['type'] == "mysql":
+        with open(backup_path, 'w') as f:
+            result = subprocess.run(cmd, env=env, check=True, stdout=f)
+    else:
+        result = subprocess.run(cmd, env=env, check=True)
+    if result.returncode != 0:
+        raise Exception(f"Backup failed with exit code {result.returncode} {result.stdout}")
+
+# Updated DAG definition
 for db_name, db_config in config['databases'].items():
-    dag_id = f'database_backup_{db_name}'
+    backup_type = db_config.get('backup_type', 'base')
 
-    with DAG(
-            dag_id,
-            default_args=default_args,
-            description=f'Database backup DAG for {db_name}',
-            schedule_interval=config['backup_settings']['incremental_schedule'],
-            start_date=datetime(2024, 1, 1),
-            catchup=False,
-            tags=['backup'],
-    ) as dag:
-        # Base backup task
-        base_backup = PythonOperator(
-            task_id='base_backup',
-            python_callable=perform_backup,
-            op_kwargs={'db_name': db_name, 'backup_type': 'base'},
-            trigger_rule='all_success'
-        )
+    if backup_type == 'base':
+        dag_id = f'database_base_backup_{db_name}'
 
-        # Incremental backup task
-        incremental_backup = PythonOperator(
-            task_id='incremental_backup',
-            python_callable=perform_backup,
-            op_kwargs={'db_name': db_name, 'backup_type': 'incremental'},
-            trigger_rule='all_success'
-        )
+        with DAG(
+                dag_id,
+                default_args=default_args,
+                description=f'Base backup DAG for {db_name}',
+                schedule_interval=config['backup_settings']['base_backup_schedule'],
+                start_date=datetime(2024, 1, 1),
+                catchup=False,
+                tags=db_config['tags'],
+        ) as dag:
+            base_backup_task = PythonOperator(
+                task_id='base_backup_task',
+                python_callable=perform_backup,
+                op_kwargs={'db_name': db_name},
+                trigger_rule='all_success'
+            )
 
-        # Cleanup task
-        cleanup = PythonOperator(
-            task_id='cleanup_old_backups',
-            python_callable=cleanup_old_backups,
-            op_kwargs={'db_name': db_name},
-            trigger_rule='all_success'
-        )
+            cleanup_base = PythonOperator(
+                task_id='cleanup_old_backups',
+                python_callable=cleanup_old_backups,
+                op_kwargs={'db_name': db_name},
+                trigger_rule='all_success'
+            )
 
-        # Set dependencies
-        base_backup >> incremental_backup >> cleanup
+            base_backup_task >> cleanup_base
+
+    elif backup_type == 'incremental':
+        dag_id = f'database_incremental_backup_{db_name}'
+
+        with DAG(
+                dag_id,
+                default_args=default_args,
+                description=f'Incremental backup DAG for {db_name}',
+                schedule_interval=config['backup_settings']['incremental_schedule'],
+                start_date=datetime(2024, 1, 1),
+                catchup=False,
+                tags=db_config['tags'],
+        ) as dag:
+            base_backup_task = PythonOperator(
+                task_id='base_backup_task',
+                python_callable=perform_backup,
+                op_kwargs={'db_name': db_name},
+                trigger_rule='all_success'
+            )
+
+            incremental_backup_task = PythonOperator(
+                task_id='incremental_backup_task',
+                python_callable=perform_backup,
+                op_kwargs={'db_name': db_name},
+                trigger_rule='all_success'
+            )
+
+            cleanup_incremental = PythonOperator(
+                task_id='cleanup_old_backups',
+                python_callable=cleanup_old_backups,
+                op_kwargs={'db_name': db_name},
+                trigger_rule='all_success'
+            )
+
+            base_backup_task >> incremental_backup_task >> cleanup_incremental
