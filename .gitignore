@@ -4,6 +4,7 @@
 .env
 __pycache__
 sample_apache_airflow/airflow_postgres_data/
+sample_apache_airflow/dags/dag/backup_config.yml
 sample_apache_airflow/mydb/
 sample_apache_airflow/mysqltest/
 sample_apache_airflow/backup/
