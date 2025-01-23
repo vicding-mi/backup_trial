@@ -14,11 +14,6 @@ import pendulum
 
 logger = logging.getLogger(__name__)
 
-# Load config
-dag_dir = os.path.dirname(os.path.realpath(__file__))
-config_path = os.path.join(dag_dir, 'backup_config.yml')
-config_url = 'https://example.com/path/to/backup_config.yml'
-
 
 def load_config():
     try:
@@ -33,8 +28,13 @@ def load_config():
     return config
 
 
-config = load_config()
+# Load config
 env = os.environ.copy()
+dag_dir = os.path.dirname(os.path.realpath(__file__))
+config_path = os.path.join(dag_dir, 'backup_config.yml')
+config_url = env.get('BACKUP_CONFIG_URL', "")
+
+config = load_config()
 
 
 ### MessageProvider
@@ -217,6 +217,7 @@ default_args = {
 
 # Define the timezone
 local_tz = pendulum.timezone(env.get("TZ", "Europe/Amsterdam"))
+
 
 # Updated perform_backup function
 def perform_backup(db_name: str, **context):

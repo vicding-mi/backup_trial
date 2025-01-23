@@ -3,6 +3,7 @@
 .vscode/
 .env
 __pycache__
+backup_stack/
 sample_apache_airflow/airflow_postgres_data/
 sample_apache_airflow/dags/dag/backup_config.yml
 sample_apache_airflow/mydb/
