@@ -1,6 +1,13 @@
 # Backup Postgresql and Mysql
 
-This repository contains DAG recepie for backing up databases over network. The schedule is configured by using the `backup_config.yaml` file. The DAG will automatically create full and incremental backups based on the schedule and retention period. Old backup sets are cleaned up based on the retention period and only full sets will be removed to make sure there is no dangling incremental backups.
+This repository contains DAG recipe for backing up databases over network. The schedule is configured by using the `backup_config.yaml` file. The DAG will automatically create full and incremental backups based on the schedule and retention period. Old backup sets are cleaned up based on the retention period and only full sets will be removed to make sure there is no dangling incremental backups.
+## TODO
+
+- [x] Send message to Slack
+- [ ] Test query for health check of graph db 
+  - [ ] Web UI: https://data.goldenagents.org/query/https%3A%2F%2Fsparql2.goldenagents.org%2Frijksmuseum
+  - [ ] Test script and query in tests folder `query.*`
+
 
 ## Key features of this implementation
 

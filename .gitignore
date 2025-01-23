@@ -1,5 +1,6 @@
 .venv/
 .idea/
+.vscode/
 .env
 __pycache__
 sample_apache_airflow/airflow_postgres_data/
