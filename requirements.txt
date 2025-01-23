@@ -2,3 +2,4 @@ apache-airflow~=2.10.3
 PyYAML~=6.0.2
 requests~=2.32.3
 apache-airflow-providers-slack~=9.0.0
+pendulum~=3.0.0

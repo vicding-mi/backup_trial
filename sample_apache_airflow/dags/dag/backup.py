@@ -1,7 +1,7 @@
+from time import timezone
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-# from airflow.providers.slack.operators.slack_webhook import SlackWebhookOperator
-# from airflow.models import Variable
 from datetime import datetime, timedelta
 import json
 import yaml
@@ -10,7 +10,7 @@ import subprocess
 from typing import Dict, List
 import logging
 import requests
-from requests.auth import HTTPBasicAuth
+import pendulum
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,7 @@ def load_config():
 
 
 config = load_config()
+env = os.environ.copy()
 
 
 ### MessageProvider
@@ -86,7 +87,10 @@ def notify_on_success(context):
 def notify_on_failure(context):
     task_instance = context['task_instance']
     backup_path = task_instance.xcom_pull(task_ids='base_backup_task', key='backup_path')
-    backup_size = os.path.getsize(backup_path)
+    if os.path.isfile(backup_path):
+        backup_size = os.path.getsize(backup_path)
+    else:
+        backup_size = -1
     start_time = task_instance.start_date
     end_time = task_instance.end_date
 
@@ -208,9 +212,11 @@ default_args = {
     'email_on_failure': True,
     'email_on_retry': False,
     'retries': 1,
-    'retry_delay': timedelta(minutes=1),
+    'retry_delay': timedelta(minutes=5),
 }
 
+# Define the timezone
+local_tz = pendulum.timezone(env.get("TZ", "Europe/Amsterdam"))
 
 # Updated perform_backup function
 def perform_backup(db_name: str, **context):
@@ -238,7 +244,6 @@ def perform_backup(db_name: str, **context):
         base_backup = _find_latest_base_backup(db_name)
         cmd = handler.incremental_backup_cmd(db_config, backup_path, base_backup)
 
-    env = os.environ.copy()
     env['PGPASSWORD'] = db_config['password']
 
     if db_config['type'] == "mysql":
@@ -262,7 +267,7 @@ for db_name, db_config in config['databases'].items():
                 default_args=default_args,
                 description=f'Base backup DAG for {db_name}',
                 schedule_interval=config['backup_settings']['base_backup_schedule'],
-                start_date=datetime(2025, 1, 1),
+                start_date=datetime(2025, 1, 1, tzinfo=local_tz),
                 catchup=False,
                 tags=db_config['tags'],
         ) as dag:
