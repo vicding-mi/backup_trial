@@ -11,21 +11,32 @@ from typing import Dict, List
 import logging
 import requests
 import pendulum
+import base64
 
 logger = logging.getLogger(__name__)
 
 
-def load_config():
+def load_config() -> Dict | None:
+    headers = {
+        "PRIVATE-TOKEN": config_url_token
+    }
     try:
-        response = requests.get(config_url)
+        response = requests.get(config_url, headers=headers)
         response.raise_for_status()
-        config = yaml.safe_load(response.text)
-        logger.info("Config loaded from internet.")
-    except (requests.RequestException, yaml.YAMLError):
+        if response.status_code == 200:
+            # Parse the YAML content
+            response_content = response.json()
+            content = response_content["content"]
+            decoded_content = base64.b64decode(content).decode("utf-8")
+            config = yaml.safe_load(decoded_content)
+            logger.info("Config loaded from private repo.")
+            return config
+    except:
         with open(config_path) as f:
             config = yaml.safe_load(f)
             logger.info("Config loaded from local file.")
-    return config
+        return config
+    return None
 
 
 # Load config
@@ -33,8 +44,11 @@ env = os.environ.copy()
 dag_dir = os.path.dirname(os.path.realpath(__file__))
 config_path = os.path.join(dag_dir, 'backup_config.yml')
 config_url = env.get('BACKUP_CONFIG_URL', "")
+config_url_token = env.get('BACKUP_CONFIG_TOKEN', "")
 
 config = load_config()
+if not config:
+    raise Exception("Failed to load config")
 
 
 ### MessageProvider
