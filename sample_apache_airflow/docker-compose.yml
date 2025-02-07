@@ -128,6 +128,8 @@ services:
       retries: 5
       start_period: 30s
     restart: always
+    ports:
+      - "8080:8080"
     depends_on:
       <<: *airflow-common-depends-on
       airflow-init:
